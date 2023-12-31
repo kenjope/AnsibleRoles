@@ -1,0 +1,24 @@
+# Ansible Playbook for Application Deployment
+
+---
+- name: Deploy Web Application
+  hosts: servers
+  become: true
+
+  tasks:
+    - name: Fetch the latest code from Git
+      git:
+        repo: https://github.com/example/web-app.git
+        dest: /opt/web-app
+        version: master
+
+    - name: Install dependencies
+      command: /opt/web-app/scripts/install.sh
+
+    - name: Configure the application
+      template:
+        src: templates/app.conf.j2
+        dest: /etc/web-app/app.conf
+
+    - name: Start the application
+      command: /opt/web-app/scripts/start.sh
