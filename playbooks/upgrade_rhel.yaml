@@ -1,0 +1,27 @@
+---
+- name: Upgrade Red Hat to a Newer Version
+  hosts: 192.168.1.71 192.168.1.85
+  become: true
+  tasks:
+    - name: Ensure the system is fully updated
+      dnf:
+        name: '*'
+        state: latest
+      become: true
+
+    - name: Install the DNF system upgrade plugin
+      dnf:
+        name: dnf-plugin-system-upgrade
+        state: present
+      become: true
+      msg: '***************** Go figure ******************' 
+##  upgrade conditionally depending on current version ***************************************
+
+    - name: Download the packages for the upgrade
+      command: "dnf system-upgrade download --releasever=<version> -y"
+      become: true
+
+    - name: Perform the system upgrade
+      command: "dnf system-upgrade reboot -y"
+      become: true
+

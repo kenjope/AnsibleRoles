@@ -1,0 +1,119 @@
+# Create an Ansible playbook file (e.g., nginx_haproxy_jenkins.yml):
+
+---
+- name: Configure Nginx and HAProxy for Jenkins
+  hosts: server1 server2
+  become: true
+
+  tasks:
+    - name: Install Nginx and HAProxy
+      package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - nginx
+        - haproxy
+
+    - name: Configure Nginx
+      template:
+        src: nginx.conf.j2
+        dest: /etc/nginx/nginx.conf
+      notify: Restart Nginx
+
+    - name: Configure HAProxy
+      template:
+        src: haproxy.cfg.j2
+        dest: /etc/haproxy/haproxy.cfg
+      notify: Restart HAProxy
+
+  handlers:
+    - name: Restart Nginx
+      service:
+        name: nginx
+        state: restarted
+
+    - name: Restart HAProxy
+      service:
+        name: haproxy
+        state: restarted
+
+
+
+# Create a Jinja2 template file (nginx.conf.j2) for the Nginx configuration
+
+# nginx.conf.j2
+user nginx;
+worker_processes auto;
+error_log /var/log/nginx/error.log;
+pid /run/nginx.pid;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    log_format main '$proxy_host - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+    access_log /var/log/nginx/access.log main;
+
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+    types_hash_max_size 2048;
+
+    server {
+        listen 80;
+        server_name your_jenkins_domain.com;
+
+        location / {
+            proxy_pass http://haproxy_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+}
+
+
+#  Create another Jinja2 template file (haproxy.cfg.j2) for the HAProxy configuration:
+
+# haproxy.cfg.j2
+global
+    log /dev/log local0
+    log /dev/log local1 notice
+    chroot /var/lib/haproxy
+    stats socket /run/haproxy/admin.sock mode 660 level admin expose-fd listeners
+    stats timeout 30s
+    user haproxy
+    group haproxy
+    daemon
+
+defaults
+    log global
+    mode http
+    option httplog
+    option dontlognull
+    timeout connect 5000
+    timeout client 50000
+    timeout server 50000
+
+frontend http_front
+    bind *:8080
+    mode http
+    default_backend jenkins_backend
+
+backend jenkins_backend
+    mode http
+    balance roundrobin
+    server jenkins_server1 your_jenkins_server1_ip:your_jenkins_server1_port check
+    server jenkins_server2 your_jenkins_server2_ip:your_jenkins_server2_port check
+    # Add more Jenkins backend servers as needed
+
+
+Replace placeholders like your_jenkins_domain.com, your_jenkins_serverX_ip, and your_jenkins_serverX_port with your actual values.
+
+After creating the files, run the playbook

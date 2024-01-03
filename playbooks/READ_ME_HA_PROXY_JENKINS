@@ -1,0 +1,112 @@
+# For Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install nginx haproxy
+
+# For Red Hat/CentOS
+sudo yum install epel-release
+sudo yum install nginx haproxy
+
+sudo nano /etc/nginx/nginx.conf
+
+
+user nginx;
+worker_processes auto;
+error_log /var/log/nginx/error.log;
+pid /run/nginx.pid;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    log_format main '$proxy_host - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+    access_log /var/log/nginx/access.log main;
+
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+    types_hash_max_size 2048;
+
+    server {
+        listen 80;
+        server_name your_jenkins_domain.com;
+
+        location / {
+            proxy_pass http://haproxy_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+}
+
+
+sudo nano /etc/haproxy/haproxy.cfg
+global
+    log /dev/log local0
+    log /dev/log local1 notice
+    chroot /var/lib/haproxy
+    stats socket /run/haproxy/admin.sock mode 660 level admin expose-fd listeners
+    stats timeout 30s
+    user haproxy
+    group haproxy
+    daemon
+
+defaults
+    log global
+    mode http
+    option httplog
+    option dontlognull
+    timeout connect 5000
+    timeout client 50000
+    timeout server 50000
+
+frontend http_front
+    bind *:8080
+    mode http
+    default_backend jenkins_backend
+
+backend jenkins_backend
+    mode http
+    balance roundrobin
+    server jenkins_server1 your_jenkins_server1_ip:your_jenkins_server1_port check
+    server jenkins_server2 your_jenkins_server2_ip:your_jenkins_server2_port check
+    # Add more Jenkins backend servers as needed
+
+
+
+sudo systemctl restart nginx
+sudo systemctl restart haproxy
+
+
+## Make sure your Jenkins instance is configured to accept requests from the new proxy setup. Update the Jenkins URL in the Jenkins system configuration to match the new domain and port if necessary.
+
+
+If you want to enable SSL termination in Nginx, obtain an SSL cert and update Nginx conf accordingly
+
+server {
+    listen 443 ssl;
+    server_name your_jenkins_domain.com;
+
+    ssl_certificate /path/to/your/ssl/certificate.crt;
+    ssl_certificate_key /path/to/your/ssl/private.key;
+
+    # Other SSL-related configurations
+
+    location / {
+        proxy_pass http://haproxy_backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+
+
+
