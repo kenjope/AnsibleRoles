@@ -1,0 +1,56 @@
+---
+- name: Upgrade RHEL Servers to version 9.3
+  hosts: 192.168.1.71
+  become: true
+
+  tasks:
+    - name: Confirm the Red Hat subscription status
+      shell: subscription-manager list --installed
+
+    - name: Enable necessary repositories
+      shell: subscription-manager repos --enable rhel-8-for-x86_64-baseos-rpms --enable rhel-8-for-x86_64-appstream-rpms
+
+    - name: Lock the system to version 8.9
+      shell: subscription-manager release --set 8.9
+
+    - name: Update the repositories
+      shell: dnf update -y
+
+    - name: Install Leapp
+      shell: dnf install -y leapp-upgrade
+    
+    - name: Install Leapp and dnf-command(versionlock)
+      dnf:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - leapp-upgrade
+        - dnf-command(versionlock)
+
+    - name: Remove any application version locks
+      shell: dnf versionlock clear
+
+    - name: Disable zone drifting in the firewall
+      lineinfile:
+        path: /etc/firewalld/firewalld.conf
+        line: AllowZoneDrifting=no
+      notify: restart firewalld
+      when: not firewall_config_changed | default(false)
+
+    - name: Set fact indicating that firewall config has been changed
+      set_fact:
+        firewall_config_changed: true
+      when: not firewall_config_changed | default(false)
+
+    - name: Pre-upgrade check with Leapp
+      shell: leapp preupgrade --target 9.3
+
+    - name: Upgrade to RHEL 9 with Leapp
+      shell: leapp upgrade --target 9.3
+
+  handlers:
+    - name: restart firewalld
+      service:
+        name: firewalld
+        state: restarted
+

@@ -1,0 +1,48 @@
+---
+- name: Upgrade-to-RHEL-9
+  hosts: 192.168.1.71
+  collections: 
+    community.general.leapp
+  become: true
+
+  tasks:
+    - name: Check for available updates
+      yum:
+        list: updates
+      register: yum_update
+      changed_when: False
+
+    - name: Update all packages
+      yum:
+        name: '*'
+        state: latest
+      when: yum_update.results | length > 0
+
+    - name: Install EPEL Release
+      shell:
+        cmd: "dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm"
+
+    - name: Upgrade to RHEL 9 using Leapp
+      command: leapp upgrade 
+      register: upgrade_result
+      async: 3680  # Set a timeout for the upgrade process (adjust as needed)
+      poll: 0
+
+    - name: Wait for Upgrade to Complete
+      async_status:
+        jid: "{{ upgrade_result.ansible_job_id }}"
+      register: job_result
+      until: job_result.finished
+      retries: 180
+      delay: 60
+
+    - name: Reboot the system
+      debug:
+        msg: "Rebooting"
+      when: job_result.finished
+
+    - name: Perform Reboot
+      command: reboot
+      async: 0
+      poll: 0
+      when: job_result.finished

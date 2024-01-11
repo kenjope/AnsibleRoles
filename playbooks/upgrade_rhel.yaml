@@ -1,0 +1,19 @@
+---
+- name: Install leapp-upgrade-command
+  hosts: 192.168.1.71
+  become: yes
+  tasks:
+    - name: Install leapp-upgrade-command package
+      ansible.builtin.package:
+        name: 'leapp-command(upgrade)'
+        state: present
+
+- name: Run leapp upgrade
+  hosts: 192.168.1.71
+  become: yes
+  tasks:
+    - name: Execute leapp upgrade
+      ansible.builtin.command:
+        cmd: leapp upgrade
+      async: 43200
+      poll: 0

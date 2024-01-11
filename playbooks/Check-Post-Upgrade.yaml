@@ -1,0 +1,12 @@
+---
+- name: Post Upgrade Checks for RHEL Servers
+  hosts: 192.168.1.71
+  become: true
+
+  tasks:
+    - name: Confirming the upgrade is complete
+      shell: cat /etc/redhat-release; uname -r
+
+    - name: Next, confirm that the system is associated with your subscription
+      shell: subscription-manager list --installed
+

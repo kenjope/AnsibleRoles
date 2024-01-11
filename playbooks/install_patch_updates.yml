@@ -1,0 +1,68 @@
+---
+
+- hosts: all
+  become_user: root
+  serial: 2
+#  disable_gpg_check: yes
+
+# Patch all our Linux Systems - keni 2/1/2024 
+# test in Sandbox environments first before attempting to deploy
+
+  tasks:
+
+    # The purpose of this task is to check if the application is running or stopped
+    - name:   verify that application/database processes are not running
+      # the -v switch on the grep is to select non-matching lines and direct them to oblivion 
+      shell:  if ps -eaf | egrep 'apache|http'| grep -v grep > /dev/null ;then echo 'process_running';else echo 'process_not_running';fi
+      ignore_errors: true
+      register: app_process_check 
+
+
+    # this task is a decision as to whether the play will fail/quit if the application is running
+    - name:  decision point to start patching
+      fail: msg="{{ inventory_hostname }}' have running Application. Please stop the applicatoin first, before attempt at patching."
+      when: app_process_check.stdout == "process_running"
+
+
+    # this task would upgrade/install the rpm's if appplication is stopped
+    - name:  upgrade all packages on the server
+      yum: 
+       name="kernel"  
+       state=latest
+      when: app_process_check.stdout == "process_not_running" and ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprose Linux'
+      register: yum_update
+      
+
+    # this task is to check if the kernel update occurred and the system needs a reboot 
+    - name: check if a reboot is required after the kernel update
+      shell: KERNEL_NEW=$(rpm -q --last kernel |head -1 | awk '{print $1}' | sed 's/kernel-//'); KERNEL_NOW=$(uname -r); if [[ $KERNEL_NEW != $KERNEL_NOW ]]; then echo "reboot_needed"; else echo "rebbot_not_needed"; fi
+      ignore_errors: true
+      register: reboot_required
+
+    # this task is to restart the system 
+    - name: restart system
+      command: shutdown -r +1  "Rebooting System After Patching"
+      async: 0
+      poll: 0
+      when: reboot_required.stdouut == "reboot_needed"
+      register:  reboot_started
+      ignore_errors: true
+
+    # this task is to wait for 3 minutes for the system to come up after the reboot.  Change minutes as required 
+    - name: pause for 180 secs
+      pause:
+        minutes: 3
+
+    # this task is to confirm, system is up and respongding to ssh
+    - name:  check if system responds to ssh
+      local_action:
+        module:  wait_for
+          host= {{ inventory_hostname }}
+          port=22
+          delay=15
+          timeout=300
+          state=started
+      when: reboot_started|changed
+        
+    # END    
+

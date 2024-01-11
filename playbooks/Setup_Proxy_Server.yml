@@ -1,0 +1,35 @@
+---
+- name: Install and configure Squid proxy
+  hosts: your_target_servers
+  become: true
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+      when: ansible_os_family == 'Debian'
+      
+    - name: Update system (for Red Hat-based systems)
+      yum:
+        update_cache: yes 
+      when: "'RedHat' in ansible_os_family"
+
+    - name: Install Squid
+      package:
+        name: squid
+        state: present
+      when: ansible_os_family == 'Debian' or ansible_os_family == 'RedHat' or ansible_os_family == 'CentOS'
+
+    - name: Copy Squid configuration file
+      template:
+        src: squid.conf.j2
+        dest: /etc/squid/squid.conf
+      notify: Restart Squid
+
+  handlers:
+    - name: Restart Squid
+      systemd:
+        name: squid
+        state: restarted
+      when: ansible_os_family == 'Debian' or ansible_os_family == 'RedHat' or ansible_os_family == 'CentOS'
+

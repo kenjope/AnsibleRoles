@@ -1,0 +1,20 @@
+---
+- name: Perform OS Patching 
+#  hosts: "{{ NODES }}"
+  hosts: rh1 
+  become: yes
+  vars:
+    service_list:
+      - nginx
+      - httpd
+      - mysqld
+
+  tasks:
+   - name: Send Notification
+     debug:
+       msg: "Sending notification"
+
+   - name: Patching Pre-Check
+     include_role:
+       name: linux-os-patching
+       tasks_from: pre-check.yml

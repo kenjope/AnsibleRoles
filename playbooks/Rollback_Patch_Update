@@ -1,0 +1,28 @@
+---
+- name: Rollback Patch Update
+  hosts: rh1
+  become: yes
+
+  tasks:
+    - name: List installed packages and their versions
+      command: rpm -qa --qf "%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\n"
+      register: installed_packages_before
+
+    - name: Revert to a specific package version (replace with the desired version)
+      yum:
+        name: "{{ item }}"
+        state: present
+        allow_downgrade: yes
+      loop: "{{ installed_packages_before.stdout_lines }}"
+      when: "'desired-package' in item"
+
+    - name: List installed packages after rollback
+      command: rpm -qa --qf "%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\n"
+      register: installed_packages_after
+
+    - name: Compare installed packages before and after rollback
+      debug:
+        msg: "Installed packages before rollback: {{ installed_packages_before.stdout_lines }}\nInstalled packages after rollback: {{ installed_packages_after.stdout_lines }}"
+
+    # Add tasks to handle service restarts or additional rollback steps if needed.
+

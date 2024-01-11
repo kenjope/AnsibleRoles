@@ -1,0 +1,8 @@
+---
+- name: Ping Test
+  hosts: servers
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Ping the servers
+      ping:

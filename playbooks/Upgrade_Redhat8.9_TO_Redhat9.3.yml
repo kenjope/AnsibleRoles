@@ -1,0 +1,60 @@
+---
+- name: Upgrade RHEL 8.9 to RHEL 9.3
+  hosts: all
+  become: true
+  tasks:
+    - name: Get current RHEL version
+      command: "cat /etc/redhat-release"
+      register: current_version
+      become: true
+
+    - name: Debug output of the current version
+      debug:
+        var: current_version.stdout_lines
+
+    - name: Check if the current version is RHEL 8.9
+      fail:
+        msg: "This playbook is designed to upgrade from RHEL 8.9. The current version is {{ current_version.stdout }}"
+      when: "'8.9' not in current_version.stdout"
+
+    - name: Ensure the system is fully updated
+      dnf:
+        name: '*'
+        state: latest
+      become: true
+
+    - name: Install the DNF system upgrade plugin
+      dnf:
+        name: dnf-plugin-system-upgrade
+        state: present
+      become: true
+
+    - name: Download the packages for the upgrade
+      command: "dnf system-upgrade download --releasever=9.3 --allowerasing -y"
+      become: true
+      environment:
+        RHSM_USERNAME: "kejope"
+        RHSM_PASSWORD: "1RwhBwr75!"
+
+    - name: Perform the system upgrade
+      command: "dnf system-upgrade reboot -y"
+      become: true
+
+ # this task is to wait for 3 minutes for the system to come up after the reboot.  Change minutes as required
+    - name: pause for 180 secs
+      pause:
+        minutes: 3
+
+    # this task is to confirm, system is up and respongding to ssh
+    - name:  check if system responds to ssh
+      local_action:
+        module:  wait_for
+          host= {{ inventory_hostname }}
+          port=22
+          delay=15
+          timeout=300
+          state=started
+      when: reboot_started|changed
+
+    # END
+

@@ -1,0 +1,17 @@
+---
+- name: Running Patching Pre-check
+  debug: 
+    msg: "Pre-check started"
+
+- name: Get Service List
+  service_facts:
+
+- name: Show services
+  debug:
+    msg: "{{ ansible_facts.services }}"
+- name: Filter Running Services
+  set_fact:
+    running_services: "{{ ansible_facts | json_query('services.* |[?state == `running`].name') }}
+
+
+

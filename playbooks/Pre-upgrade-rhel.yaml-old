@@ -1,0 +1,10 @@
+---
+- name: Check leapp upgrade readiness
+  hosts: 192.168.1.71
+  become: yes
+  tasks:
+   - name: Execute leapp preupgrade check
+     ansible.builtin.command:
+       cmd: "leapp preupgrade"
+     register: preupgrade_result
+     failed_when: false
